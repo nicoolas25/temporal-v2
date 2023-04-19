@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Generic, Iterator, Sequence, TypeVar
+from typing import Callable, Generic, Iterator, Sequence, TypeVar
 
 from temporal.perspective import Perspective, PerspectiveEntry
 
@@ -10,7 +10,7 @@ T = TypeVar("T")
 
 
 @dataclass(frozen=True)
-class HistoryEntry(Generic[T], Effective):
+class HistoryEntry(Effective, Generic[T]):
     effectivity: TimeRange
     settled_at: TimePoint
     version: int
@@ -18,8 +18,14 @@ class HistoryEntry(Generic[T], Effective):
     _is_forgotten: bool = False
 
     def get_value(self) -> T:
-        if self._is_forgotten:
+        if self.is_empty():
             raise MissingValueError("No known value at this time")
+
+        return self._value
+
+    def get_value_or_none(self) -> T | None:
+        if self.is_empty():
+            return None
 
         return self._value
 
@@ -35,11 +41,13 @@ class History(Generic[T]):
         self,
         id: str,
         entries: Sequence[HistoryEntry[T]] = tuple(),
+        on_record: Callable[[HistoryEntry[T], "History[T]"], None] | None = None,
     ) -> None:
         super().__init__()
 
         self.id = id
         self._entries = list(entries)
+        self._on_record = on_record
 
         # Trust entries' order... but verify.
         for previous_entry, next_entry in zip(self._entries, self._entries[1:]):
@@ -52,6 +60,10 @@ class History(Generic[T]):
                     "Entries's version are expected to be following each other"
                 )
 
+    def __iter__(self) -> Iterator[HistoryEntry[T]]:
+        for entry in self._entries:
+            yield entry
+
     def record(
         self,
         value: T,
@@ -62,14 +74,16 @@ class History(Generic[T]):
         Record that value was effective during the effectivity time range.
         """
 
-        self._entries.append(
-            HistoryEntry(
-                _value=value,
-                effectivity=effectivity,
-                settled_at=_settled_at or TimePoint.now(),
-                version=self._get_next_version(),
-            ),
+        new_entry = HistoryEntry(
+            _value=value,
+            effectivity=effectivity,
+            settled_at=_settled_at or TimePoint.now(),
+            version=self._get_next_version(),
         )
+        self._entries.append(new_entry)
+
+        if self._on_record:
+            self._on_record(new_entry, self)
 
     def forget(
         self,
@@ -123,7 +137,7 @@ class History(Generic[T]):
                 [
                     PerspectiveEntry(effectivity=projection[0], value=projection[1])
                     for projection in projections
-                    if projection[2]
+                    if not projection[2]
                 ],
                 key=lambda pe: pe.effectivity.start,
             ),

@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
-from typing import Iterable, Iterator, Protocol, Union
+from typing import Optional, Protocol, Union
 
 
 class Effective(Protocol):
@@ -77,33 +77,45 @@ class TimeRange:
             end=max(self.end, other.end),
         )
 
-    def subtract(self, other: "TimeRange") -> Iterator["TimeRange"]:
-        if not self.overlap_with(other=other):
-            yield self
+    def subtract_all(self, others: list["TimeRange"]) -> list["TimeRange"]:
+        results = []
+        points_of_interest = sorted(
+            set(
+                time_point
+                for time_range in others
+                for time_point in (time_range.start, time_range.end)
+                if time_point in self
+            ),
+        )
+        in_range = self.start if not self.start in points_of_interest else None
+        for time_point in points_of_interest:
+            if in_range and not time_point.is_min():
+                prev_time_point = time_point.prev() 
+                if not any(prev_time_point in other for other in others):
+                    results.append(TimeRange(start=in_range, end=prev_time_point))
+                    in_range = None
+            elif not time_point.is_max():
+                next_time_point = time_point.next()
+                if not any(next_time_point in other for other in others):
+                    in_range = next_time_point
+        if in_range and not any(self.end in other for other in others):
+            results.append(TimeRange(start=in_range, end=self.end))
+        return results
+
+    @classmethod
+    def from_datetimes(
+        cls, start: datetime | None, end: datetime | None
+    ) -> "TimeRange":
+        if start and end:
+            return cls(start=TimePoint(start), end=TimePoint(end))
+        elif start and end is None:
+            return cls(start=TimePoint(start))
+        elif end and start is None:
+            return cls(end=TimePoint(end))
+        elif start is None and end is None:
+            return cls()
         else:
-            if self.start < other.start:
-                yield TimeRange(start=self.start, end=other.start.prev())
-
-            if self.end > other.end:
-                yield TimeRange(start=other.end.next(), end=self.end)
-
-    def subtract_all(self, others: Iterable["TimeRange"]) -> list["TimeRange"]:
-        to_split_time_ranges = {self}
-        while to_split_time_ranges:
-            newly_split_time_ranges = {
-                split_time_range
-                for to_split_time_range in to_split_time_ranges
-                for other in others
-                for split_time_range in to_split_time_range.subtract(other)
-            }
-
-            # We're "stable", nothing more will be split
-            if newly_split_time_ranges == to_split_time_ranges:
-                break
-
-            to_split_time_ranges = newly_split_time_ranges
-
-        return list(to_split_time_ranges)
+            raise ValueError("Invalid arguments")
 
     @classmethod
     def from_dates(cls, start: date, end: date) -> "TimeRange":
@@ -134,6 +146,13 @@ class TimePoint:
             self._datetime: datetime = datetime(year=d.year, month=d.month, day=d.day)
 
     @classmethod
+    def parse(cls, d: datetime | date | None) -> Optional["TimePoint"]:
+        if d is None:
+            return None
+        else:
+            return TimePoint(d)
+
+    @classmethod
     def max(cls) -> "TimePoint":
         if not hasattr(cls, "_max"):
             cls._max = cls(datetime.max)
@@ -155,8 +174,20 @@ class TimePoint:
     def prev(self) -> "TimePoint":
         return TimePoint(self._datetime - timedelta(seconds=1))
 
+    def is_max(self) -> bool:
+        return self == TimePoint.max()
+
+    def is_min(self) -> bool:
+        return self == TimePoint.min()
+
     def add_days(self, days: int) -> "TimePoint":
         return TimePoint(self._datetime + timedelta(days=days))
+
+    def to_datetime(self, min_max_as_none: bool = True) -> datetime | None:
+        if min_max_as_none and (self == TimePoint.min() or self == TimePoint.max()):
+            return None
+        else:
+            return self._datetime
 
     def __repr__(self) -> str:
         return self._datetime.isoformat()

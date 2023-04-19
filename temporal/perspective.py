@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Generic, Sequence, TypeVar
+from typing import Generic, Iterator, Sequence, TypeVar
 
 from temporal.effective import Effective, TimePoint, TimeRange
 from temporal.errors import MalformedPerspectiveError, MissingValueError
@@ -8,7 +8,7 @@ T = TypeVar("T")
 
 
 @dataclass(frozen=True)
-class PerspectiveEntry(Generic[T], Effective):
+class PerspectiveEntry(Effective, Generic[T]):
     effectivity: TimeRange
     value: T
 
@@ -38,6 +38,10 @@ class Perspective(Generic[T]):
 
         # Compact entries
         self._compact_entries()
+
+    def __iter__(self) -> Iterator[PerspectiveEntry[T]]:
+        for entry in self._entries:
+            yield entry
 
     def fetch(self, at: TimePoint) -> T:
         for entry in reversed(self._entries):
