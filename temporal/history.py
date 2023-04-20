@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Callable, Generic, Iterator, Sequence, TypeVar
 
-from temporal.perspective import Perspective, PerspectiveEntry
+from temporal.perspective import Perspective, Snapshot
 
 from .effective import Effective, TimePoint, TimeRange
 from .errors import MalformedHistoryError, MissingValueError
@@ -135,7 +135,7 @@ class History(Generic[T]):
             settled_at=settled_at,
             entries=sorted(
                 [
-                    PerspectiveEntry(effectivity=projection[0], value=projection[1])
+                    Snapshot(effectivity=projection[0], value=projection[1])
                     for projection in projections
                     if not projection[2]
                 ],

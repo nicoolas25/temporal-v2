@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, true
+from sqlalchemy import DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 
-class PerspectiveEntryMixin:
+class SnapshotMixin:
     start_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,

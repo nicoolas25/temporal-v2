@@ -8,17 +8,17 @@ T = TypeVar("T")
 
 
 @dataclass(frozen=True)
-class PerspectiveEntry(Effective, Generic[T]):
+class Snapshot(Effective, Generic[T]):
     effectivity: TimeRange
     value: T
 
 
 class Perspective(Generic[T]):
     settled_at: TimePoint
-    _entries: list[PerspectiveEntry[T]]
+    _entries: list[Snapshot[T]]
 
     def __init__(
-        self, settled_at: TimePoint, entries: Sequence[PerspectiveEntry[T]] = tuple()
+        self, settled_at: TimePoint, entries: Sequence[Snapshot[T]] = tuple()
     ) -> None:
         super().__init__()
 
@@ -39,7 +39,7 @@ class Perspective(Generic[T]):
         # Compact entries
         self._compact_entries()
 
-    def __iter__(self) -> Iterator[PerspectiveEntry[T]]:
+    def __iter__(self) -> Iterator[Snapshot[T]]:
         for entry in self._entries:
             yield entry
 
@@ -60,7 +60,7 @@ class Perspective(Generic[T]):
             ):
                 last_value = compacted_entries.pop()
                 compacted_entries.append(
-                    PerspectiveEntry(
+                    Snapshot(
                         effectivity=last_value.effectivity.union(entry.effectivity),
                         value=entry.value,
                     )

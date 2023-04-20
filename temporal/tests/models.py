@@ -3,9 +3,9 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from temporal.effective import TimePoint, TimeRange
 from temporal.history import History, HistoryEntry
-from temporal.perspective import Perspective, PerspectiveEntry
+from temporal.perspective import Perspective, Snapshot
 from temporal.sqla.history_entry_mixin import HistoryEntryMixin
-from temporal.sqla.perspective_entry_mixin import PerspectiveEntryMixin
+from temporal.sqla.snapshot_mixin import SnapshotMixin
 
 
 class Base(DeclarativeBase):
@@ -60,7 +60,7 @@ class Subscription(Base):
             self._latest_perspective = Perspective(
                 settled_at=TimePoint.now(),
                 entries=[
-                    PerspectiveEntry(
+                    Snapshot(
                         effectivity=TimeRange.from_datetimes(
                             start=version.start_at,
                             end=version.end_at,
@@ -101,7 +101,7 @@ class Subscription(Base):
         self._latest_perspective = None
 
 
-class SubscriptionVersion(PerspectiveEntryMixin, Base):
+class SubscriptionVersion(SnapshotMixin, Base):
     """
     Persisted projection of a subscription history using all available knowledge.
 
